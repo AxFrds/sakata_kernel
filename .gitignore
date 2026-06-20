@@ -177,3 +177,8 @@ sphinx_*/
 /rust-project.json
 
 *.zip
+/anykernel/Image
+/anykernel/Image.gz
+/anykernel/Image.lz4
+/Sakata-Kernel-*.zip
+/build-sakata.log
