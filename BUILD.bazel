@@ -36,8 +36,6 @@ load(
     "get_gki_protected_modules_list",
     "get_kunit_modules_list",
 )
-load(":msm_platforms.bzl", "define_msm_platforms")
-
 package(
     default_visibility = [
         "//visibility:public",
@@ -600,9 +598,6 @@ copy_to_dist_dir(
 define_consolidate()
 
 define_consolidate_16k()
-
-define_msm_platforms()
-
 _ROCKPI4_MODULE_OUTS = [
     # keep sorted
     "drivers/char/hw_random/virtio-rng.ko",
