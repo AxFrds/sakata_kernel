@@ -7,7 +7,7 @@ LOG_FILE="${WORKSPACE}/build-sakata.log"
 
 cd "${WORKSPACE}"
 
-BUILD_TIMESTAMP="$(TZ=Asia/Jakarta date '+%a, %d %b %Y %H:%M:%S WIB')"
+BUILD_TIMESTAMP="$(TZ=Asia/Jakarta date '+%a, %d %b %Y %H:%M:%S %z')"
 
 echo "=========================================="
 echo "Sakata Kernel Kleaf Build"
