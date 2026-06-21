@@ -7,7 +7,7 @@ LOG_FILE="${WORKSPACE}/build-sakata.log"
 
 cd "${WORKSPACE}"
 
-BUILD_TIMESTAMP="$(TZ=Asia/Jakarta date '+%a, %d %b %Y %H:%M:%S %z')"
+BUILD_TIMESTAMP="$(TZ=Asia/Jakarta date '+%Y-%m-%d %H:%M:%S')"
 
 echo "=========================================="
 echo "Sakata Kernel Kleaf Build"
@@ -16,35 +16,30 @@ echo "Host      : sakataprjkt.xyz"
 echo "Timestamp : ${BUILD_TIMESTAMP}"
 echo "=========================================="
 
-python3 - "${BUILD_TIMESTAMP}" <<'PY'
+python3 - "${ENV_FILE}" "${BUILD_TIMESTAMP}" <<'PY'
 from pathlib import Path
 import re
 import sys
 
-timestamp = sys.argv[1]
-path = Path("build/kernel/_setup_env.sh")
-text = path.read_text()
+env_file = Path(sys.argv[1])
+timestamp = sys.argv[2]
 
-replacement = (
-    'export KBUILD_BUILD_TIMESTAMP="'
-    + timestamp.replace('"', '\\"')
-    + '"'
-)
+text = env_file.read_text()
+
+replacement = f'export KBUILD_BUILD_TIMESTAMP="{timestamp}"'
 
 text, count = re.subn(
-    r"^export KBUILD_BUILD_TIMESTAMP=.*$",
+    r'^export KBUILD_BUILD_TIMESTAMP=.*$',
     replacement,
     text,
     count=1,
     flags=re.MULTILINE,
 )
 
-if count != 1:
-    raise SystemExit(
-        "Baris KBUILD_BUILD_TIMESTAMP tidak ditemukan"
-    )
+if count == 0:
+    text = text.rstrip() + "\n" + replacement + "\n"
 
-path.write_text(text)
+env_file.write_text(text)
 print(f"Timestamp Kleaf: {timestamp}")
 PY
 
