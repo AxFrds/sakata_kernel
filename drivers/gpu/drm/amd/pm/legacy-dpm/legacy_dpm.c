@@ -797,7 +797,8 @@ static struct amdgpu_ps *amdgpu_dpm_pick_power_state(struct amdgpu_device *adev,
 	int i;
 	struct amdgpu_ps *ps;
 	u32 ui_class;
-	bool single_display = adev->pm.pm_display_cfg.num_display < 2;
+	bool single_display = (adev->pm.dpm.new_active_crtc_count < 2) ?
+		true : false;
 
 	/* check if the vblank period is too short to adjust the mclk */
 	if (single_display && adev->powerplay.pp_funcs->vblank_too_short) {
@@ -1002,8 +1003,7 @@ void amdgpu_legacy_dpm_compute_clocks(void *handle)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
 
-	if (!adev->dc_enabled)
-		amdgpu_dpm_get_display_cfg(adev);
+	amdgpu_dpm_get_active_displays(adev);
 
 	amdgpu_dpm_change_power_state_locked(adev);
 }
@@ -1018,12 +1018,9 @@ void amdgpu_dpm_thermal_work_handler(struct work_struct *work)
 	enum amd_pm_state_type dpm_state = POWER_STATE_TYPE_INTERNAL_THERMAL;
 	int temp, size = sizeof(temp);
 
-	mutex_lock(&adev->pm.mutex);
-
-	if (!adev->pm.dpm_enabled) {
-		mutex_unlock(&adev->pm.mutex);
+	if (!adev->pm.dpm_enabled)
 		return;
-	}
+
 	if (!pp_funcs->read_sensor(adev->powerplay.pp_handle,
 				   AMDGPU_PP_SENSOR_GPU_TEMP,
 				   (void *)&temp,
@@ -1045,5 +1042,4 @@ void amdgpu_dpm_thermal_work_handler(struct work_struct *work)
 	adev->pm.dpm.state = dpm_state;
 
 	amdgpu_legacy_dpm_compute_clocks(adev->powerplay.pp_handle);
-	mutex_unlock(&adev->pm.mutex);
 }

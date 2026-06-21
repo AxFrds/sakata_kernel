@@ -65,8 +65,7 @@ static enum drm_gpu_sched_stat amdgpu_job_timedout(struct drm_sched_job *s_job)
 	DRM_ERROR("Process information: process %s pid %d thread %s pid %d\n",
 		  ti.process_name, ti.tgid, ti.task_name, ti.pid);
 
-	if (dma_fence_get_status(&s_job->s_fence->finished) == 0)
-		dma_fence_set_error(&s_job->s_fence->finished, -ETIME);
+	dma_fence_set_error(&s_job->s_fence->finished, -ETIME);
 
 	if (amdgpu_device_should_recover_gpu(ring->adev)) {
 		struct amdgpu_reset_context reset_context;
@@ -166,8 +165,8 @@ void amdgpu_job_free_resources(struct amdgpu_job *job)
 	/* Check if any fences where initialized */
 	if (job->base.s_fence && job->base.s_fence->finished.ops)
 		f = &job->base.s_fence->finished;
-	else if (job->hw_fence.base.ops)
-		f = &job->hw_fence.base;
+	else if (job->hw_fence.ops)
+		f = &job->hw_fence;
 	else
 		f = NULL;
 
@@ -184,10 +183,10 @@ static void amdgpu_job_free_cb(struct drm_sched_job *s_job)
 	amdgpu_sync_free(&job->explicit_sync);
 
 	/* only put the hw fence if has embedded fence */
-	if (!job->hw_fence.base.ops)
+	if (!job->hw_fence.ops)
 		kfree(job);
 	else
-		dma_fence_put(&job->hw_fence.base);
+		dma_fence_put(&job->hw_fence);
 }
 
 void amdgpu_job_set_gang_leader(struct amdgpu_job *job,
@@ -216,10 +215,10 @@ void amdgpu_job_free(struct amdgpu_job *job)
 	if (job->gang_submit != &job->base.s_fence->scheduled)
 		dma_fence_put(job->gang_submit);
 
-	if (!job->hw_fence.base.ops)
+	if (!job->hw_fence.ops)
 		kfree(job);
 	else
-		dma_fence_put(&job->hw_fence.base);
+		dma_fence_put(&job->hw_fence);
 }
 
 struct dma_fence *amdgpu_job_submit(struct amdgpu_job *job)
