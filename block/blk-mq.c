@@ -24,20 +24,13 @@
 #include <linux/sched/sysctl.h>
 #include <linux/sched/topology.h>
 #include <linux/sched/signal.h>
-#ifndef __GENKSYMS__
-#include <linux/suspend.h>
-#endif
 #include <linux/delay.h>
 #include <linux/crash_dump.h>
 #include <linux/prefetch.h>
 #include <linux/blk-crypto.h>
 #include <linux/part_stat.h>
-#ifndef __GENKSYMS__
-#include <linux/sched/isolation.h>
-#endif
 
 #include <trace/events/block.h>
-#include <trace/hooks/blk.h>
 
 #include <trace/hooks/blk.h>
 
@@ -288,12 +281,12 @@ void blk_mq_quiesce_tagset(struct blk_mq_tag_set *set)
 {
 	struct request_queue *q;
 
-	rcu_read_lock();
-	list_for_each_entry_rcu(q, &set->tag_list, tag_set_list) {
+	mutex_lock(&set->tag_list_lock);
+	list_for_each_entry(q, &set->tag_list, tag_set_list) {
 		if (!blk_queue_skip_tagset_quiesce(q))
 			blk_mq_quiesce_queue_nowait(q);
 	}
-	rcu_read_unlock();
+	mutex_unlock(&set->tag_list_lock);
 
 	blk_mq_wait_quiesce_done(set);
 }
@@ -303,12 +296,12 @@ void blk_mq_unquiesce_tagset(struct blk_mq_tag_set *set)
 {
 	struct request_queue *q;
 
-	rcu_read_lock();
-	list_for_each_entry_rcu(q, &set->tag_list, tag_set_list) {
+	mutex_lock(&set->tag_list_lock);
+	list_for_each_entry(q, &set->tag_list, tag_set_list) {
 		if (!blk_queue_skip_tagset_quiesce(q))
 			blk_mq_unquiesce_queue(q);
 	}
-	rcu_read_unlock();
+	mutex_unlock(&set->tag_list_lock);
 }
 EXPORT_SYMBOL_GPL(blk_mq_unquiesce_tagset);
 
@@ -2213,15 +2206,6 @@ static inline int blk_mq_first_mapped_cpu(struct blk_mq_hw_ctx *hctx)
 }
 
 /*
- * ->next_cpu is always calculated from hctx->cpumask, so simply use
- * it for speeding up the check
- */
-static bool blk_mq_hctx_empty_cpumask(struct blk_mq_hw_ctx *hctx)
-{
-        return hctx->next_cpu >= nr_cpu_ids;
-}
-
-/*
  * It'd be great if the workqueue API had a way to pass
  * in a mask and had some smarts for more clever placement.
  * For now we just round-robin here, switching for every
@@ -2232,8 +2216,7 @@ static int blk_mq_hctx_next_cpu(struct blk_mq_hw_ctx *hctx)
 	bool tried = false;
 	int next_cpu = hctx->next_cpu;
 
-	/* Switch to unbound if no allowable CPUs in this hctx */
-	if (hctx->queue->nr_hw_queues == 1 || blk_mq_hctx_empty_cpumask(hctx))
+	if (hctx->queue->nr_hw_queues == 1)
 		return WORK_CPU_UNBOUND;
 
 	if (--hctx->next_cpu_batch <= 0) {
@@ -3048,8 +3031,6 @@ void blk_mq_submit_bio(struct bio *bio)
 	unsigned int nr_segs = 1;
 	blk_status_t ret;
 
-	trace_android_vh_check_set_ioprio(bio);
-
 	bio = blk_queue_bounce(bio, q);
 
 	if (plug) {
@@ -3561,13 +3542,11 @@ struct rq_iter_data {
 static bool blk_mq_has_request(struct request *rq, void *data)
 {
 	struct rq_iter_data *iter_data = data;
-	bool ret = false;
 
 	if (rq->mq_hctx != iter_data->hctx)
 		return true;
 	iter_data->has_rq = true;
-	trace_android_rvh_blk_mq_has_request(iter_data->hctx, rq, &ret);
-	return ret;
+	return false;
 }
 
 static bool blk_mq_hctx_has_requests(struct blk_mq_hw_ctx *hctx)
@@ -3582,39 +3561,23 @@ static bool blk_mq_hctx_has_requests(struct blk_mq_hw_ctx *hctx)
 	return data.has_rq;
 }
 
-static bool blk_mq_hctx_has_online_cpu(struct blk_mq_hw_ctx *hctx,
-		unsigned int this_cpu)
+static inline bool blk_mq_last_cpu_in_hctx(unsigned int cpu,
+		struct blk_mq_hw_ctx *hctx)
 {
-	enum hctx_type type = hctx->type;
-	int cpu;
-
-	/*
-	 * hctx->cpumask has to rule out isolated CPUs, but userspace still
-	 * might submit IOs on these isolated CPUs, so use the queue map to
-	 * check if all CPUs mapped to this hctx are offline
-	 */
-	for_each_online_cpu(cpu) {
-		struct blk_mq_hw_ctx *h = blk_mq_map_queue_type(hctx->queue,
-				type, cpu);
-
-		if (h != hctx)
-			continue;
-
-		/* this hctx has at least one online CPU */
-		if (this_cpu != cpu)
-			return true;
-	}
-
-	return false;
+	if (cpumask_first_and(hctx->cpumask, cpu_online_mask) != cpu)
+		return false;
+	if (cpumask_next_and(cpu, hctx->cpumask, cpu_online_mask) < nr_cpu_ids)
+		return false;
+	return true;
 }
 
 static int blk_mq_hctx_notify_offline(unsigned int cpu, struct hlist_node *node)
 {
 	struct blk_mq_hw_ctx *hctx = hlist_entry_safe(node,
 			struct blk_mq_hw_ctx, cpuhp_online);
-	int ret = 0;
 
-	if (!hctx->nr_ctx || blk_mq_hctx_has_online_cpu(hctx, cpu))
+	if (!cpumask_test_cpu(cpu, hctx->cpumask) ||
+	    !blk_mq_last_cpu_in_hctx(cpu, hctx))
 		return 0;
 
 	/*
@@ -3633,40 +3596,12 @@ static int blk_mq_hctx_notify_offline(unsigned int cpu, struct hlist_node *node)
 	 * frozen and there are no requests.
 	 */
 	if (percpu_ref_tryget(&hctx->queue->q_usage_counter)) {
-		while (blk_mq_hctx_has_requests(hctx)) {
-			/*
-			 * The wakeup capable IRQ handler of block device is
-			 * not called during suspend. Skip the loop by checking
-			 * pm_wakeup_pending to prevent the deadlock and improve
-			 * suspend latency.
-			 */
-			if (pm_wakeup_pending()) {
-				clear_bit(BLK_MQ_S_INACTIVE, &hctx->state);
-				ret = -EBUSY;
-				break;
-			}
+		while (blk_mq_hctx_has_requests(hctx))
 			msleep(5);
-		}
 		percpu_ref_put(&hctx->queue->q_usage_counter);
 	}
 
-	return ret;
-}
-
-/*
- * Check if one CPU is mapped to the specified hctx
- *
- * Isolated CPUs have been ruled out from hctx->cpumask, which is supposed
- * to be used for scheduling kworker only. For other usage, please call this
- * helper for checking if one CPU belongs to the specified hctx
- */
-static bool blk_mq_cpu_mapped_to_hctx(unsigned int cpu,
-		const struct blk_mq_hw_ctx *hctx)
-{
-	struct blk_mq_hw_ctx *mapped_hctx = blk_mq_map_queue_type(hctx->queue,
-			hctx->type, cpu);
-
-	return mapped_hctx == hctx;
+	return 0;
 }
 
 static int blk_mq_hctx_notify_online(unsigned int cpu, struct hlist_node *node)
@@ -3674,7 +3609,7 @@ static int blk_mq_hctx_notify_online(unsigned int cpu, struct hlist_node *node)
 	struct blk_mq_hw_ctx *hctx = hlist_entry_safe(node,
 			struct blk_mq_hw_ctx, cpuhp_online);
 
-	if (blk_mq_cpu_mapped_to_hctx(cpu, hctx))
+	if (cpumask_test_cpu(cpu, hctx->cpumask))
 		clear_bit(BLK_MQ_S_INACTIVE, &hctx->state);
 	return 0;
 }
@@ -3692,7 +3627,7 @@ static int blk_mq_hctx_notify_dead(unsigned int cpu, struct hlist_node *node)
 	enum hctx_type type;
 
 	hctx = hlist_entry_safe(node, struct blk_mq_hw_ctx, cpuhp_dead);
-	if (!blk_mq_cpu_mapped_to_hctx(cpu, hctx))
+	if (!cpumask_test_cpu(cpu, hctx->cpumask))
 		return 0;
 
 	ctx = __blk_mq_get_ctx(hctx->queue, cpu);
@@ -4123,8 +4058,6 @@ static void blk_mq_map_swqueue(struct request_queue *q)
 	}
 
 	queue_for_each_hw_ctx(q, hctx, i) {
-		int cpu;
-
 		/*
 		 * If no software queues are mapped to this hardware queue,
 		 * disable it and free the request entries.
@@ -4150,15 +4083,6 @@ static void blk_mq_map_swqueue(struct request_queue *q)
 		 * over all possibly mapped software queues.
 		 */
 		sbitmap_resize(&hctx->ctx_map, hctx->nr_ctx);
-
-		/*
-		 * Rule out isolated CPUs from hctx->cpumask to avoid
-		 * running block kworker on isolated CPUs
-		 */
-		for_each_cpu(cpu, hctx->cpumask) {
-			if (cpu_is_isolated(cpu))
-				cpumask_clear_cpu(cpu, hctx->cpumask);
-		}
 
 		/*
 		 * Initialize batch roundrobin counts
@@ -4206,7 +4130,7 @@ static void blk_mq_del_queue_tag_set(struct request_queue *q)
 	struct blk_mq_tag_set *set = q->tag_set;
 
 	mutex_lock(&set->tag_list_lock);
-	list_del_rcu(&q->tag_set_list);
+	list_del(&q->tag_set_list);
 	if (list_is_singular(&set->tag_list)) {
 		/* just transitioned to unshared */
 		set->flags &= ~BLK_MQ_F_TAG_QUEUE_SHARED;
@@ -4214,6 +4138,7 @@ static void blk_mq_del_queue_tag_set(struct request_queue *q)
 		blk_mq_update_tag_set_shared(set, false);
 	}
 	mutex_unlock(&set->tag_list_lock);
+	INIT_LIST_HEAD(&q->tag_set_list);
 }
 
 static void blk_mq_add_queue_tag_set(struct blk_mq_tag_set *set,
@@ -4232,7 +4157,7 @@ static void blk_mq_add_queue_tag_set(struct blk_mq_tag_set *set,
 	}
 	if (set->flags & BLK_MQ_F_TAG_QUEUE_SHARED)
 		queue_set_hctx_shared(q, true);
-	list_add_tail_rcu(&q->tag_set_list, &set->tag_list);
+	list_add_tail(&q->tag_set_list, &set->tag_list);
 
 	mutex_unlock(&set->tag_list_lock);
 }
@@ -4489,12 +4414,6 @@ int blk_mq_init_allocated_queue(struct blk_mq_tag_set *set,
 	/* mark the queue as mq asap */
 	q->mq_ops = set->ops;
 
-	/*
-	 * ->tag_set has to be setup before initialize hctx, which cpuphp
-	 * handler needs it for checking queue mapping
-	 */
-	q->tag_set = set;
-
 	if (blk_mq_alloc_ctxs(q))
 		goto err_exit;
 
@@ -4512,6 +4431,8 @@ int blk_mq_init_allocated_queue(struct blk_mq_tag_set *set,
 
 	INIT_WORK(&q->timeout_work, blk_mq_timeout_work);
 	blk_queue_rq_timeout(q, set->timeout ? set->timeout : 30 * HZ);
+
+	q->tag_set = set;
 
 	q->queue_flags |= QUEUE_FLAG_MQ_DEFAULT;
 	blk_mq_update_poll_flag(q);

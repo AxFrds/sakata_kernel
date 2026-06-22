@@ -2068,26 +2068,6 @@ static int find_lowest_rq(struct task_struct *task)
 	return -1;
 }
 
-static struct task_struct *pick_next_pushable_task(struct rq *rq)
-{
-	struct task_struct *p;
-
-	if (!has_pushable_tasks(rq))
-		return NULL;
-
-	p = plist_first_entry(&rq->rt.pushable_tasks,
-			      struct task_struct, pushable_tasks);
-
-	BUG_ON(rq->cpu != task_cpu(p));
-	BUG_ON(task_current(rq, p));
-	BUG_ON(p->nr_cpus_allowed <= 1);
-
-	BUG_ON(!task_on_rq_queued(p));
-	BUG_ON(!rt_task(p));
-
-	return p;
-}
-
 /* Will lock the rq it finds */
 static struct rq *find_lock_lowest_rq(struct task_struct *task, struct rq *rq)
 {
@@ -2118,16 +2098,18 @@ static struct rq *find_lock_lowest_rq(struct task_struct *task, struct rq *rq)
 			/*
 			 * We had to unlock the run queue. In
 			 * the mean time, task could have
-			 * migrated already or had its affinity changed,
-			 * therefore check if the task is still at the
-			 * head of the pushable tasks list.
+			 * migrated already or had its affinity changed.
+			 * Also make sure that it wasn't scheduled on its rq.
 			 * It is possible the task was scheduled, set
 			 * "migrate_disabled" and then got preempted, so we must
 			 * check the task migration disable flag here too.
 			 */
-			if (unlikely(is_migration_disabled(task) ||
+			if (unlikely(task_rq(task) != rq ||
 				     !cpumask_test_cpu(lowest_rq->cpu, &task->cpus_mask) ||
-				     task != pick_next_pushable_task(rq))) {
+				     task_on_cpu(rq, task) ||
+				     !rt_task(task) ||
+				     is_migration_disabled(task) ||
+				     !task_on_rq_queued(task))) {
 
 				double_unlock_balance(rq, lowest_rq);
 				lowest_rq = NULL;
@@ -2145,6 +2127,26 @@ static struct rq *find_lock_lowest_rq(struct task_struct *task, struct rq *rq)
 	}
 
 	return lowest_rq;
+}
+
+static struct task_struct *pick_next_pushable_task(struct rq *rq)
+{
+	struct task_struct *p;
+
+	if (!has_pushable_tasks(rq))
+		return NULL;
+
+	p = plist_first_entry(&rq->rt.pushable_tasks,
+			      struct task_struct, pushable_tasks);
+
+	BUG_ON(rq->cpu != task_cpu(p));
+	BUG_ON(task_current(rq, p));
+	BUG_ON(p->nr_cpus_allowed <= 1);
+
+	BUG_ON(!task_on_rq_queued(p));
+	BUG_ON(!rt_task(p));
+
+	return p;
 }
 
 /*
@@ -2324,7 +2326,6 @@ static void push_rt_tasks(struct rq *rq)
  */
 static int rto_next_cpu(struct root_domain *rd)
 {
-	int this_cpu = smp_processor_id();
 	int next;
 	int cpu;
 
@@ -2350,10 +2351,6 @@ static int rto_next_cpu(struct root_domain *rd)
 		trace_android_rvh_rto_next_cpu(rd->rto_cpu, rd->rto_mask, &cpu);
 
 		rd->rto_cpu = cpu;
-
-		/* Do not send IPI to self */
-		if (cpu == this_cpu)
-			continue;
 
 		if (cpu < nr_cpu_ids)
 			return cpu;
