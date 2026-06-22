@@ -514,6 +514,10 @@ DECLARE_RESTRICTED_HOOK(android_rvh_task_fits_cpu,
 		 unsigned long uclamp_max, int cpu, bool *fits, bool *done),
 	TP_ARGS(tsk, util, uclamp_min, uclamp_max, cpu, fits, done), 1);
 
+DECLARE_HOOK(android_vh_set_sugov_sched_attr,
+	TP_PROTO(struct sched_attr *attr),
+	TP_ARGS(attr));
+
 #endif /* _TRACE_HOOK_SCHED_H */
 /* This part must be outside protection */
 #include <trace/define_trace.h>

@@ -118,6 +118,13 @@
 #include <trace/hooks/sched.h>
 #include <trace/hooks/dtask.h>
 #include <trace/hooks/mm.h>
+#include <linux/export.h>
+
+#ifdef CONFIG_GKI_DYNAMIC_TASK_STRUCT_SIZE
+u64 vendor_data_pad[CONFIG_GKI_TASK_STRUCT_VENDOR_SIZE_MAX / sizeof(u64)];
+EXPORT_SYMBOL_GPL(vendor_data_pad);
+#endif
+
 /*
  * Minimum number of threads to boot the kernel
  */
@@ -1264,6 +1271,8 @@ static int __init coredump_filter_setup(char *s)
 __setup("coredump_filter=", coredump_filter_setup);
 
 #include <linux/init_task.h>
+
+
 
 static void mm_init_aio(struct mm_struct *mm)
 {
