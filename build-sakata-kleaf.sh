@@ -7,16 +7,21 @@ LOG_FILE="${WORKSPACE}/build-sakata.log"
 
 cd "${WORKSPACE}"
 
-BUILD_TIMESTAMP="$(TZ=Asia/Jakarta date '+%Y-%m-%d %H:%M:%S')"
+# Parseable internal timestamp for Kbuild.
+# Kernel build tools usually parse this with date -d.
+BUILD_TIMESTAMP_PARSE="$(LC_ALL=C TZ=Asia/Jakarta date '+%a, %d %b %Y %H:%M:%S %z')"
+
+# Human readable display format.
+BUILD_TIMESTAMP_LABEL="$(LC_ALL=C TZ=Asia/Jakarta date '+%a %b %d %H:%M:%S WIB %Y')"
 
 echo "=========================================="
 echo "Sakata Kernel Kleaf Build"
 echo "User      : axfrds"
 echo "Host      : sakataprjkt.xyz"
-echo "Timestamp : ${BUILD_TIMESTAMP}"
+echo "Timestamp : ${BUILD_TIMESTAMP_LABEL}"
 echo "=========================================="
 
-python3 - "${ENV_FILE}" "${BUILD_TIMESTAMP}" <<'PY'
+python3 - "${ENV_FILE}" "${BUILD_TIMESTAMP_PARSE}" <<'PY'
 from pathlib import Path
 import re
 import sys
@@ -26,21 +31,26 @@ timestamp = sys.argv[2]
 
 text = env_file.read_text()
 
-replacement = f'export KBUILD_BUILD_TIMESTAMP="{timestamp}"'
+def upsert_export(text, key, value):
+    line = f'export {key}="{value}"'
+    text, count = re.subn(
+        rf'^export {key}=.*$',
+        line,
+        text,
+        count=1,
+        flags=re.MULTILINE,
+    )
+    if count == 0:
+        text = text.rstrip() + "\n" + line + "\n"
+    return text
 
-text, count = re.subn(
-    r'^export KBUILD_BUILD_TIMESTAMP=.*$',
-    replacement,
-    text,
-    count=1,
-    flags=re.MULTILINE,
-)
-
-if count == 0:
-    text = text.rstrip() + "\n" + replacement + "\n"
+text = upsert_export(text, "TZ", "Asia/Jakarta")
+text = upsert_export(text, "KBUILD_BUILD_TIMESTAMP", timestamp)
 
 env_file.write_text(text)
-print(f"Timestamp Kleaf: {timestamp}")
+
+print(f"Kbuild timestamp internal: {timestamp}")
+print("Kbuild timezone display  : Asia/Jakarta / WIB")
 PY
 
 tools/bazel shutdown
