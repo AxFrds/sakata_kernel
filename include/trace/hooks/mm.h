@@ -580,6 +580,7 @@ DECLARE_HOOK(android_vh_cma_release_bypass,
 	TP_PROTO(struct cma *cma, const struct page *pages, unsigned long count,
 		bool *bypass),
 	TP_ARGS(cma, pages, count, bypass));
+
 DECLARE_HOOK(android_vh_cma_alloc_fail,
 	TP_PROTO(const char *name, unsigned long cma_count,
 		unsigned long count),

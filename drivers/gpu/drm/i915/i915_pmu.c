@@ -101,11 +101,11 @@ static unsigned int config_bit(const u64 config)
 		return other_bit(config);
 }
 
-static __always_inline u32 config_mask(const u64 config)
+static u32 config_mask(const u64 config)
 {
 	unsigned int bit = config_bit(config);
 
-	if (__builtin_constant_p(bit))
+	if (__builtin_constant_p(config))
 		BUILD_BUG_ON(bit >
 			     BITS_PER_TYPE(typeof_member(struct i915_pmu,
 							 enable)) - 1);
@@ -114,7 +114,7 @@ static __always_inline u32 config_mask(const u64 config)
 			     BITS_PER_TYPE(typeof_member(struct i915_pmu,
 							 enable)) - 1);
 
-	return BIT(bit);
+	return BIT(config_bit(config));
 }
 
 static bool is_engine_event(struct perf_event *event)

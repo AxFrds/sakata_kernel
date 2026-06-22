@@ -1,6 +1,5 @@
 [abi_symbol_list]
   activate_task
-  active_load_balance_cpu_stop
   add_cpu
   add_timer
   add_timer_on
@@ -2290,7 +2289,6 @@
   runqueues
   sbitmap_weight
   sched_clock
-  sched_energy_present
   sched_feat_keys
   sched_setattr_nocheck
   sched_set_fifo
@@ -2739,11 +2737,9 @@
   __traceiter_android_rvh_set_cpus_allowed_ptr
   __traceiter_android_rvh_set_iowait
   __traceiter_android_rvh_setscheduler
-  __traceiter_android_rvh_setscheduler_prio
   __traceiter_android_rvh_set_task_cpu
   __traceiter_android_rvh_set_user_nice_locked
   __traceiter_android_rvh_swap_readpage_bdev_sync
-  __traceiter_android_rvh_task_fits_cpu
   __traceiter_android_rvh_tick_entry
   __traceiter_android_rvh_try_to_wake_up_success
   __traceiter_android_rvh_uclamp_eff_get
@@ -2765,7 +2761,6 @@
   __traceiter_android_vh_binder_set_priority
   __traceiter_android_vh_calculate_totalreserve_pages
   __traceiter_android_vh_check_new_page
-  __traceiter_android_vh_chk_task
   __traceiter_android_vh_cpu_idle_enter
   __traceiter_android_vh_cpu_idle_exit
   __traceiter_android_vh_do_async_mmap_readahead
@@ -2787,7 +2782,6 @@
   __traceiter_android_vh_post_alloc_hook
   __traceiter_android_vh_prio_inheritance
   __traceiter_android_vh_prio_restore
-  __traceiter_android_vh_put_task
   __traceiter_android_vh_resume_end
   __traceiter_android_vh_rmqueue
   __traceiter_android_vh_scheduler_tick
@@ -2896,11 +2890,9 @@
   __tracepoint_android_rvh_set_cpus_allowed_ptr
   __tracepoint_android_rvh_set_iowait
   __tracepoint_android_rvh_setscheduler
-  __tracepoint_android_rvh_setscheduler_prio
   __tracepoint_android_rvh_set_task_cpu
   __tracepoint_android_rvh_set_user_nice_locked
   __tracepoint_android_rvh_swap_readpage_bdev_sync
-  __tracepoint_android_rvh_task_fits_cpu
   __tracepoint_android_rvh_tick_entry
   __tracepoint_android_rvh_try_to_wake_up_success
   __tracepoint_android_rvh_uclamp_eff_get
@@ -2922,7 +2914,6 @@
   __tracepoint_android_vh_binder_set_priority
   __tracepoint_android_vh_calculate_totalreserve_pages
   __tracepoint_android_vh_check_new_page
-  __tracepoint_android_vh_chk_task
   __tracepoint_android_vh_cpu_idle_enter
   __tracepoint_android_vh_cpu_idle_exit
   __tracepoint_android_vh_do_async_mmap_readahead
@@ -2944,7 +2935,6 @@
   __tracepoint_android_vh_post_alloc_hook
   __tracepoint_android_vh_prio_inheritance
   __tracepoint_android_vh_prio_restore
-  __tracepoint_android_vh_put_task
   __tracepoint_android_vh_resume_end
   __tracepoint_android_vh_rmqueue
   __tracepoint_android_vh_scheduler_tick
@@ -3074,7 +3064,6 @@
   ufshcd_hold
   ufshcd_init_pwr_dev_param
   ufshcd_mcq_poll_cqe_lock
-  ufshcd_mcq_poll_n_cqe_lock
   ufshcd_mcq_read_cqis
   ufshcd_mcq_write_cqis
   ufshcd_pltfrm_init
