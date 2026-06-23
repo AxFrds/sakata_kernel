@@ -29,7 +29,9 @@ preempt-flag-$(CONFIG_PREEMPT_DYNAMIC)	:= PREEMPT_DYNAMIC
 preempt-flag-$(CONFIG_PREEMPT_RT)	:= PREEMPT_RT
 
 build-version = $(or $(KBUILD_BUILD_VERSION), $(build-version-auto))
-build-timestamp = $(or $(KBUILD_BUILD_TIMESTAMP), $(build-timestamp-auto))
+build-timestamp-raw = $(or $(KBUILD_BUILD_TIMESTAMP), $(build-timestamp-auto))
+build-timestamp-wib = $(shell LC_ALL=C TZ=Asia/Jakarta date -d '$(build-timestamp-raw)' '+%a %b %d %H:%M:%S WIB %Y' 2>/dev/null || echo '$(build-timestamp-raw)')
+build-timestamp = $(build-timestamp-wib)
 
 # Maximum length of UTS_VERSION is 64 chars
 filechk_uts_version = \

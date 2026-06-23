@@ -7,11 +7,10 @@ LOG_FILE="${WORKSPACE}/build-sakata.log"
 
 cd "${WORKSPACE}"
 
-# Parseable internal timestamp for Kbuild.
-# Kernel build tools usually parse this with date -d.
-BUILD_TIMESTAMP_PARSE="$(LC_ALL=C TZ=Asia/Jakarta date '+%a, %d %b %Y %H:%M:%S %z')"
+# Internal timestamp harus parseable oleh hermetic date Kleaf.
+BUILD_TIMESTAMP_PARSE="$(LC_ALL=C TZ=Asia/Jakarta date '+%Y-%m-%d %H:%M:%S')"
 
-# Human readable display format.
+# Tampilan manusia tetap full format WIB.
 BUILD_TIMESTAMP_LABEL="$(LC_ALL=C TZ=Asia/Jakarta date '+%a %b %d %H:%M:%S WIB %Y')"
 
 echo "=========================================="
