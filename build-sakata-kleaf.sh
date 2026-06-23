@@ -7,16 +7,11 @@ LOG_FILE="${WORKSPACE}/build-sakata.log"
 
 cd "${WORKSPACE}"
 
-<<<<<<< HEAD
-BUILD_TIMESTAMP="$(TZ=Asia/Jakarta date '+%a, %d %b %Y %H:%M:%S WIB')"
-=======
-# Parseable internal timestamp for Kbuild.
-# Kernel build tools usually parse this with date -d.
-BUILD_TIMESTAMP_PARSE="$(LC_ALL=C TZ=Asia/Jakarta date '+%a, %d %b %Y %H:%M:%S %z')"
+# Internal timestamp harus parseable oleh hermetic date Kleaf.
+BUILD_TIMESTAMP_PARSE="$(LC_ALL=C TZ=Asia/Jakarta date '+%Y-%m-%d %H:%M:%S')"
 
-# Human readable display format.
+# Tampilan manusia tetap full format WIB.
 BUILD_TIMESTAMP_LABEL="$(LC_ALL=C TZ=Asia/Jakarta date '+%a %b %d %H:%M:%S WIB %Y')"
->>>>>>> 1c8008934088 (ANDROID: sakata: update localversion and WIB build timestamp)
 
 echo "=========================================="
 echo "Sakata Kernel Kleaf Build"
@@ -25,42 +20,14 @@ echo "Host      : sakataprjkt.xyz"
 echo "Timestamp : ${BUILD_TIMESTAMP_LABEL}"
 echo "=========================================="
 
-<<<<<<< HEAD
-python3 - "${BUILD_TIMESTAMP}" <<'PY'
-=======
 python3 - "${ENV_FILE}" "${BUILD_TIMESTAMP_PARSE}" <<'PY'
->>>>>>> 1c8008934088 (ANDROID: sakata: update localversion and WIB build timestamp)
 from pathlib import Path
 import re
 import sys
 
-timestamp = sys.argv[1]
-path = Path("build/kernel/_setup_env.sh")
-text = path.read_text()
+env_file = Path(sys.argv[1])
+timestamp = sys.argv[2]
 
-<<<<<<< HEAD
-replacement = (
-    'export KBUILD_BUILD_TIMESTAMP="'
-    + timestamp.replace('"', '\\"')
-    + '"'
-)
-
-text, count = re.subn(
-    r"^export KBUILD_BUILD_TIMESTAMP=.*$",
-    replacement,
-    text,
-    count=1,
-    flags=re.MULTILINE,
-)
-
-if count != 1:
-    raise SystemExit(
-        "Baris KBUILD_BUILD_TIMESTAMP tidak ditemukan"
-    )
-
-path.write_text(text)
-print(f"Timestamp Kleaf: {timestamp}")
-=======
 text = env_file.read_text()
 
 def upsert_export(text, key, value):
@@ -83,7 +50,6 @@ env_file.write_text(text)
 
 print(f"Kbuild timestamp internal: {timestamp}")
 print("Kbuild timezone display  : Asia/Jakarta / WIB")
->>>>>>> 1c8008934088 (ANDROID: sakata: update localversion and WIB build timestamp)
 PY
 
 tools/bazel shutdown
